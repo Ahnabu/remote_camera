@@ -62,8 +62,7 @@ class WebRTCManager(private val context: Context) {
 
             override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
                 when (newState) {
-                    PeerConnection.IceConnectionState.CHECKING,
-                    PeerConnection.IceConnectionState.CONNECTING -> _connectionState.value = WebRTCState.Connecting
+                    PeerConnection.IceConnectionState.CHECKING -> _connectionState.value = WebRTCState.Connecting
                     PeerConnection.IceConnectionState.CONNECTED,
                     PeerConnection.IceConnectionState.COMPLETED -> _connectionState.value = WebRTCState.Connected
                     PeerConnection.IceConnectionState.DISCONNECTED -> _connectionState.value = WebRTCState.Disconnected("ICE Disconnected")

@@ -45,7 +45,7 @@ class PairingRepository(
                 pairedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("pairings").doc(pairingDocId).set(record).await()
+            firestore.collection("pairings").document(pairingDocId).set(record).await()
             Result.success(record)
         } catch (e: Exception) {
             Result.failure(e)

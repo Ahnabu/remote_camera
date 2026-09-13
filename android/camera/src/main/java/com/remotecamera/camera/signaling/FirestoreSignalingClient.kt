@@ -51,7 +51,7 @@ class FirestoreSignalingClient(
      * Camera posts WebRTC SDP Offer to Firestore.
      */
     suspend fun sendOffer(sessionId: String, offerSdp: String) {
-        firestore.collection("signaling").doc(sessionId).update(
+        firestore.collection("signaling").document(sessionId).update(
             mapOf(
                 "offerSdp" to offerSdp,
                 "status" to "OFFERED"
@@ -69,14 +69,14 @@ class FirestoreSignalingClient(
             sdpMLineIndex = sdpMLineIndex,
             sdp = sdp
         )
-        firestore.collection("signaling").doc(sessionId).collection("candidates").add(candidate).await()
+        firestore.collection("signaling").document(sessionId).collection("candidates").add(candidate).await()
     }
 
     /**
      * Listens for Viewer ICE candidates.
      */
     fun observeViewerIceCandidates(sessionId: String): Flow<IceCandidateRecord> = callbackFlow {
-        val listener = firestore.collection("signaling").doc(sessionId).collection("candidates")
+        val listener = firestore.collection("signaling").document(sessionId).collection("candidates")
             .whereEqualTo("sender", "VIEWER")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {

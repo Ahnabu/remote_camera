@@ -38,7 +38,7 @@ class FirestoreSignalingClient(
             viewerDeviceId = viewerDeviceId,
             status = "INITIATED"
         )
-        firestore.collection("signaling").doc(sessionId).set(session).await()
+        firestore.collection("signaling").document(sessionId).set(session).await()
         return sessionId
     }
 
@@ -46,7 +46,7 @@ class FirestoreSignalingClient(
      * Listens for Camera responses (SDP offer) for a session.
      */
     fun observeSession(sessionId: String): Flow<FirestoreSignalingSession> = callbackFlow {
-        val listener: ListenerRegistration = firestore.collection("signaling").doc(sessionId)
+        val listener: ListenerRegistration = firestore.collection("signaling").document(sessionId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
@@ -63,7 +63,7 @@ class FirestoreSignalingClient(
      * Viewer posts WebRTC SDP Answer to Firestore.
      */
     suspend fun sendAnswer(sessionId: String, answerSdp: String) {
-        firestore.collection("signaling").doc(sessionId).update(
+        firestore.collection("signaling").document(sessionId).update(
             mapOf(
                 "answerSdp" to answerSdp,
                 "status" to "ANSWERED"
@@ -81,14 +81,14 @@ class FirestoreSignalingClient(
             sdpMLineIndex = sdpMLineIndex,
             sdp = sdp
         )
-        firestore.collection("signaling").doc(sessionId).collection("candidates").add(candidate).await()
+        firestore.collection("signaling").document(sessionId).collection("candidates").add(candidate).await()
     }
 
     /**
      * Listens for Camera ICE candidates.
      */
     fun observeCameraIceCandidates(sessionId: String): Flow<IceCandidateRecord> = callbackFlow {
-        val listener = firestore.collection("signaling").doc(sessionId).collection("candidates")
+        val listener = firestore.collection("signaling").document(sessionId).collection("candidates")
             .whereEqualTo("sender", "CAMERA")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {

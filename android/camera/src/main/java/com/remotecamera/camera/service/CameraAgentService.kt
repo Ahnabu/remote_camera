@@ -129,7 +129,7 @@ class CameraAgentService : LifecycleService() {
     private fun updateDeviceStatus(status: String) {
         lifecycleScope.launch {
             try {
-                firestore.collection("devices").doc(cameraDeviceId).set(
+                firestore.collection("devices").document(cameraDeviceId).set(
                     mapOf(
                         "deviceId" to cameraDeviceId,
                         "deviceName" to "Realme C55",

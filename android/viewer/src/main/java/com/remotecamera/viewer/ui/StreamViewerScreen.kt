@@ -76,7 +76,7 @@ fun StreamViewerScreen(
             IconButton(
                 onClick = onStopStreamRequested,
                 modifier = Modifier
-                    .background(Color.Red, shape = MaterialTheme.shapes.full)
+                    .background(Color.Red, shape = androidx.compose.foundation.shape.CircleShape)
                     .size(44.dp)
             ) {
                 Icon(

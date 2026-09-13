@@ -49,7 +49,6 @@ class CryptoManager {
             KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).apply {
             setDigests(KeyProperties.DIGEST_SHA256)
-            setSelfSigned(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 setIsStrongBoxBacked(false)
             }

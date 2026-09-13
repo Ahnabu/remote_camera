@@ -53,12 +53,15 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-service:2.8.4")
+    implementation("com.google.guava:guava:33.2.1-android")
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
 
     // Firebase BoM & Services
     implementation(platform("com.google.firebase:firebase-bom:33.2.0"))
@@ -67,7 +70,7 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx")
 
     // WebRTC Native SDK
-    implementation("com.github.webrtc-sdk:android:125.6422.06")
+    implementation("com.github.webrtc-sdk:android:104.5112.10")
 
     // Navigation, DataStore, QR Code Scanner & Gson & OkHttp
     implementation("androidx.navigation:navigation-compose:2.7.7")
