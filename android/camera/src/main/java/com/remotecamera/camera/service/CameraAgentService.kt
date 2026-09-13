@@ -25,22 +25,30 @@ class CameraAgentService : LifecycleService() {
         const val EXTRA_CAMERA_DEVICE_ID = "EXTRA_CAMERA_DEVICE_ID"
 
         fun startService(context: Context, cameraDeviceId: String) {
-            val intent = Intent(context, CameraAgentService::class.java).apply {
-                action = ACTION_START_SERVICE
-                putExtra(EXTRA_CAMERA_DEVICE_ID, cameraDeviceId)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, CameraAgentService::class.java).apply {
+                    action = ACTION_START_SERVICE
+                    putExtra(EXTRA_CAMERA_DEVICE_ID, cameraDeviceId)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
 
         fun stopService(context: Context) {
-            val intent = Intent(context, CameraAgentService::class.java).apply {
-                action = ACTION_STOP_SERVICE
+            try {
+                val intent = Intent(context, CameraAgentService::class.java).apply {
+                    action = ACTION_STOP_SERVICE
+                }
+                context.startService(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            context.startService(intent)
         }
     }
 
@@ -68,7 +76,11 @@ class CameraAgentService : LifecycleService() {
             ACTION_STOP_SERVICE -> {
                 updateDeviceStatus("OFFLINE")
                 cameraManager.stopCamera()
-                stopForeground(STOP_FOREGROUND_REMOVE)
+                try {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 stopSelf()
             }
         }
@@ -100,15 +112,23 @@ class CameraAgentService : LifecycleService() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                } else {
+                    0
+                }
+                try {
+                    startForeground(NOTIFICATION_ID, notification, serviceType)
+                } catch (se: SecurityException) {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } else {
-                0
+                startForeground(NOTIFICATION_ID, notification)
             }
-            startForeground(NOTIFICATION_ID, notification, serviceType)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
