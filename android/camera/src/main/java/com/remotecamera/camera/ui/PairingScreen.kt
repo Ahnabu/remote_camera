@@ -16,7 +16,10 @@ import com.remotecamera.camera.pairing.QRCodeGenerator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CameraPairingScreen(pairingRepository: PairingRepository) {
+fun CameraPairingScreen(
+    pairingRepository: PairingRepository,
+    onToggleServiceRequested: (Boolean, String) -> Unit = { _, _ -> }
+) {
     val payload = remember { pairingRepository.createPairingPayload() }
     val qrBitmap = remember(payload) { QRCodeGenerator.generateQRCodeBitmap(payload.toJson(), 600, 600) }
     val pairedDevices by pairingRepository.observeActivePairings().collectAsState(initial = emptyList())
@@ -63,9 +66,34 @@ fun CameraPairingScreen(pairingRepository: PairingRepository) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    var serviceEnabled by remember { mutableStateOf(true) }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Enable Remote Camera Agent",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Switch(
+                            checked = serviceEnabled,
+                            onCheckedChange = { enabled ->
+                                serviceEnabled = enabled
+                                onToggleServiceRequested(enabled, payload.cameraDeviceId)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text("Device ID: ${payload.cameraDeviceId}", style = MaterialTheme.typography.bodySmall)
                     Text("Public Key (EC secp256r1): Hardware Keystore Backed", style = MaterialTheme.typography.bodySmall)
-                    Text("Status: READY / STANDBY", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = if (serviceEnabled) "Status: READY / STANDBY" else "Status: DISABLED",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (serviceEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
