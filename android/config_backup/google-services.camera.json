@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "659400670551",
+    "project_id": "remote-camera-system",
+    "storage_bucket": "remote-camera-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:659400670551:android:7639123799b6675bac1212",
+        "android_client_info": {
+          "package_name": "com.remotecamera.camera"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMOv4t5Vvp5oCJxIY7o5OLFrElYyhhEJs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

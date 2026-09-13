@@ -1,0 +1,44 @@
+# Project Documentation Folder (Ignored as requested)
+docs/
+
+# Build & System Logs
+*.log
+firebase-debug.log
+firebase-debug.*.log
+pglite-debug.log
+
+# Android & Gradle Build Artifacts
+.gradle/
+build/
+**/build/
+*.apk
+*.aar
+*.dex
+*.class
+
+# Android Studio & IDE Files
+.idea/
+.vscode/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild
+.cxx/
+local.properties
+
+# Node.js & Backend Dependencies
+node_modules/
+backend/functions/lib/
+backend/functions/node_modules/
+
+# Environment Variables & Secret Files
+.env
+.env*
+.env.local
+.env.*.local
+*.keystore
+!debug.keystore
+
+# macOS & Windows OS Files
+.DS_Store
+Thumbs.db
