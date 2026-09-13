@@ -7,17 +7,24 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-class AuthManager(private val auth: FirebaseAuth = FirebaseAuth.getInstance()) {
+class AuthManager(private val customAuth: FirebaseAuth? = null) {
+
+    private val auth: FirebaseAuth
+        get() = customAuth ?: FirebaseAuth.getInstance()
 
     val currentUser: FirebaseUser?
-        get() = auth.currentUser
+        get() = try { auth.currentUser } catch (e: Exception) { null }
 
     val authStateFlow: Flow<FirebaseUser?> = callbackFlow {
-        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
-            trySend(firebaseAuth.currentUser)
+        try {
+            val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+                trySend(firebaseAuth.currentUser)
+            }
+            auth.addAuthStateListener(listener)
+            awaitClose { auth.removeAuthStateListener(listener) }
+        } catch (e: Exception) {
+            close(e)
         }
-        auth.addAuthStateListener(listener)
-        awaitClose { auth.removeAuthStateListener(listener) }
     }
 
     suspend fun signInAnonymouslyIfNeeded(): Result<FirebaseUser> {

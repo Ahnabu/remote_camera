@@ -53,8 +53,8 @@ class CameraAgentService : LifecycleService() {
     }
 
     private lateinit var cameraManager: CameraManager
-    private val firestore = FirebaseFirestore.getInstance()
-    private val signalingClient = FirestoreSignalingClient()
+    private val firestore by lazy { FirebaseFirestore.getInstance() }
+    private val signalingClient by lazy { FirestoreSignalingClient() }
     private var cameraDeviceId: String = "Realme_C55_Agent"
 
     override fun onCreate() {

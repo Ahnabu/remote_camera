@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    private val authManager = AuthManager()
-    private val pairingRepository = PairingRepository()
+    private val authManager by lazy { AuthManager() }
+    private val pairingRepository by lazy { PairingRepository() }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -33,7 +33,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         CoroutineScope(Dispatchers.Main).launch {
-            authManager.signInAnonymouslyIfNeeded()
+            try {
+                authManager.signInAnonymouslyIfNeeded()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         checkAndRequestPermissions()

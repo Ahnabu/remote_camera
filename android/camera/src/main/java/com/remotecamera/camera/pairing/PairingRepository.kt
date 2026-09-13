@@ -8,9 +8,15 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.util.UUID
 
 class PairingRepository(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val cryptoManager: CryptoManager = CryptoManager()
+    private val customFirestore: FirebaseFirestore? = null,
+    private val customCryptoManager: CryptoManager? = null
 ) {
+    private val firestore: FirebaseFirestore
+        get() = customFirestore ?: FirebaseFirestore.getInstance()
+
+    private val cryptoManager: CryptoManager
+        get() = customCryptoManager ?: CryptoManager()
+
     val cameraDeviceId: String = "Realme_C55_${UUID.randomUUID().toString().take(8)}"
 
     /**

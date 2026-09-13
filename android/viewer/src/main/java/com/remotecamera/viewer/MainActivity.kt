@@ -16,13 +16,17 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    private val authManager = AuthManager()
-    private val pairingRepository = PairingRepository()
+    private val authManager by lazy { AuthManager() }
+    private val pairingRepository by lazy { PairingRepository() }
 
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
             CoroutineScope(Dispatchers.Main).launch {
-                pairingRepository.processScannedPairingPayload(result.contents)
+                try {
+                    pairingRepository.processScannedPairingPayload(result.contents)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -31,7 +35,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         CoroutineScope(Dispatchers.Main).launch {
-            authManager.signInAnonymouslyIfNeeded()
+            try {
+                authManager.signInAnonymouslyIfNeeded()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         setContent {

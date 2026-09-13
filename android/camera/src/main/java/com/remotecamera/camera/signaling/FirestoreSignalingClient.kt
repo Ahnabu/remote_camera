@@ -24,8 +24,10 @@ data class IceCandidateRecord(
 )
 
 class FirestoreSignalingClient(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val customFirestore: FirebaseFirestore? = null
 ) {
+    private val firestore: FirebaseFirestore
+        get() = customFirestore ?: FirebaseFirestore.getInstance()
 
     /**
      * Listens for incoming session signaling events targeting this Camera device.

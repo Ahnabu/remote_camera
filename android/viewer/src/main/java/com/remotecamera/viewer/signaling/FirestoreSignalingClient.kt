@@ -24,8 +24,10 @@ data class IceCandidateRecord(
 )
 
 class FirestoreSignalingClient(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val customFirestore: FirebaseFirestore? = null
 ) {
+    private val firestore: FirebaseFirestore
+        get() = customFirestore ?: FirebaseFirestore.getInstance()
 
     /**
      * Viewer initiates a new stream session in Firestore.

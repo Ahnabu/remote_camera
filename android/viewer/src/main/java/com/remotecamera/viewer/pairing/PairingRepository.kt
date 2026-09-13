@@ -9,9 +9,15 @@ import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class PairingRepository(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val cryptoManager: CryptoManager = CryptoManager()
+    private val customFirestore: FirebaseFirestore? = null,
+    private val customCryptoManager: CryptoManager? = null
 ) {
+    private val firestore: FirebaseFirestore
+        get() = customFirestore ?: FirebaseFirestore.getInstance()
+
+    private val cryptoManager: CryptoManager
+        get() = customCryptoManager ?: CryptoManager()
+
     val viewerDeviceId: String = "Galaxy_S20_${UUID.randomUUID().toString().take(8)}"
 
     /**
