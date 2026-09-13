@@ -16,10 +16,15 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.remotecamera.viewer.auth.AuthManager
 import com.remotecamera.viewer.pairing.PairingRepository
+import com.remotecamera.viewer.signaling.FirestoreSignalingClient
+import com.remotecamera.viewer.ui.StreamViewerScreen
 import com.remotecamera.viewer.ui.ViewerPairingScreen
+import com.remotecamera.viewer.webrtc.WebRTCManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.webrtc.IceCandidate
+import org.webrtc.PeerConnection
 
 class MainActivity : ComponentActivity() {
 
@@ -27,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
     private val authManager by lazy { AuthManager() }
     private val pairingRepository by lazy { PairingRepository() }
+    private val signalingClient by lazy { FirestoreSignalingClient() }
 
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
@@ -59,6 +65,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
+                    var activeConnectedCameraId by remember { mutableStateOf<String?>(null) }
+
                     if (startupError != null) {
                         Column(
                             modifier = Modifier
@@ -81,6 +89,79 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
+                    } else if (activeConnectedCameraId != null) {
+                        val cameraDeviceId = activeConnectedCameraId!!
+                        val webRTCManager = remember { WebRTCManager(this@MainActivity) }
+                        val scope = rememberCoroutineScope()
+
+                        DisposableEffect(cameraDeviceId) {
+                            var sessionId: String? = null
+
+                            scope.launch {
+                                try {
+                                    sessionId = signalingClient.initiateSession(cameraDeviceId, pairingRepository.viewerDeviceId)
+                                    val currentSessionId = sessionId ?: return@launch
+
+                                    val iceServers = listOf(
+                                        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+                                        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
+                                    )
+
+                                    webRTCManager.createPeerConnection(
+                                        stunTurnServers = iceServers,
+                                        onIceCandidateGenerated = { candidate ->
+                                            scope.launch {
+                                                signalingClient.sendIceCandidate(currentSessionId, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp)
+                                            }
+                                        },
+                                        onRemoteVideoTrackReceived = { track ->
+                                            Log.d("ViewerMainActivity", "Remote video track received!")
+                                        }
+                                    )
+
+                                    // Listen for SDP Offer from Camera Agent
+                                    scope.launch {
+                                        signalingClient.observeSession(currentSessionId).collect { session ->
+                                            if (!session.offerSdp.isNullOrBlank() && session.status == "OFFERED") {
+                                                webRTCManager.setRemoteOfferAndCreateAnswer(session.offerSdp) { answerDesc ->
+                                                    scope.launch {
+                                                        signalingClient.sendAnswer(currentSessionId, answerDesc.description)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Listen for Camera ICE Candidates
+                                    scope.launch {
+                                        signalingClient.observeCameraIceCandidates(currentSessionId).collect { candidateRecord ->
+                                            val iceCandidate = IceCandidate(candidateRecord.sdpMid, candidateRecord.sdpMLineIndex, candidateRecord.sdp)
+                                            webRTCManager.addRemoteIceCandidate(iceCandidate)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("ViewerMainActivity", "Signaling session error", e)
+                                }
+                            }
+
+                            onDispose {
+                                webRTCManager.close()
+                            }
+                        }
+
+                        StreamViewerScreen(
+                            cameraDeviceId = cameraDeviceId,
+                            webRTCManager = webRTCManager,
+                            onStopStreamRequested = {
+                                activeConnectedCameraId = null
+                            },
+                            onIceRestartRequested = {
+                                // Ice restart if needed
+                            },
+                            onTorchToggleRequested = { _ -> },
+                            onSwitchCameraRequested = { },
+                            onQualitySelected = { }
+                        )
                     } else {
                         ViewerPairingScreen(
                             pairingRepository = pairingRepository,
@@ -97,6 +178,9 @@ class MainActivity : ComponentActivity() {
                                 } catch (t: Throwable) {
                                     Log.e("ViewerMainActivity", "Scanner launch error", t)
                                 }
+                            },
+                            onConnectRequested = { targetCameraDeviceId ->
+                                activeConnectedCameraId = targetCameraDeviceId
                             }
                         )
                     }

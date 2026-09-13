@@ -16,7 +16,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ViewerPairingScreen(
     pairingRepository: PairingRepository,
-    onOpenScannerRequested: () -> Unit
+    onOpenScannerRequested: () -> Unit,
+    onConnectRequested: (String) -> Unit = {}
 ) {
     val pairedCameras by pairingRepository.observePairedCameras().collectAsState(initial = emptyList())
     var manualPayloadInput by remember { mutableStateOf("") }
@@ -104,7 +105,7 @@ fun ViewerPairingScreen(
                             headlineContent = { Text(camera.cameraDeviceId) },
                             supportingContent = { Text("Status: ${camera.status} | Signature Verified ✅") },
                             trailingContent = {
-                                Button(onClick = { /* Connect to camera */ }) {
+                                Button(onClick = { onConnectRequested(camera.cameraDeviceId) }) {
                                     Text("Connect")
                                 }
                             }
