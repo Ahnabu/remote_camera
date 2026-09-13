@@ -15,6 +15,12 @@ import com.remotecamera.camera.camerax.CameraManager
 import com.remotecamera.camera.signaling.FirestoreSignalingClient
 import kotlinx.coroutines.launch
 
+import android.util.Log
+import com.remotecamera.camera.webrtc.WebRTCManager
+import org.webrtc.IceCandidate
+import org.webrtc.PeerConnection
+import org.webrtc.SurfaceTextureHelper
+
 class CameraAgentService : LifecycleService() {
 
     companion object {
@@ -55,6 +61,8 @@ class CameraAgentService : LifecycleService() {
     private lateinit var cameraManager: CameraManager
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val signalingClient by lazy { FirestoreSignalingClient() }
+    private val webrtcManager by lazy { WebRTCManager(this) }
+    private var activeSessionId: String? = null
     private var cameraDeviceId: String = "Realme_C55_Agent"
 
     override fun onCreate() {
@@ -76,6 +84,11 @@ class CameraAgentService : LifecycleService() {
             ACTION_STOP_SERVICE -> {
                 updateDeviceStatus("OFFLINE")
                 cameraManager.stopCamera()
+                try {
+                    webrtcManager.close()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 try {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                 } catch (e: Exception) {
@@ -166,20 +179,75 @@ class CameraAgentService : LifecycleService() {
     private fun observeSignalingEvents() {
         lifecycleScope.launch {
             signalingClient.observeSessionEvents(cameraDeviceId).collect { session ->
-                if (session.status == "INITIATED") {
+                if (session.status == "INITIATED" && activeSessionId != session.sessionId) {
+                    activeSessionId = session.sessionId
                     updateDeviceStatus("BUSY")
-                    // Start CameraX preview for WebRTC capture
-                    cameraManager.startCamera(this@CameraAgentService)
+                    startWebRtcStreamingSession(session.sessionId)
                 } else if (session.status == "STOPPED") {
                     updateDeviceStatus("READY")
-                    cameraManager.stopCamera()
+                    activeSessionId = null
+                    webrtcManager.close()
+                } else if (session.status == "ANSWERED" && session.sessionId == activeSessionId && !session.answerSdp.isNullOrBlank()) {
+                    webrtcManager.setRemoteAnswer(session.answerSdp)
                 }
             }
         }
     }
 
+    private fun startWebRtcStreamingSession(sessionId: String) {
+        try {
+            val iceServers = listOf(
+                PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+                PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
+            )
+
+            webrtcManager.createPeerConnection(iceServers) { candidate ->
+                lifecycleScope.launch {
+                    try {
+                        signalingClient.sendIceCandidate(sessionId, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp)
+                    } catch (e: Exception) {
+                        Log.e("CameraAgentService", "Error sending ICE candidate", e)
+                    }
+                }
+            }
+
+            // Create video capturer and attach to WebRTC stream
+            val capturer = webrtcManager.createCameraCapturer(this)
+            if (capturer != null) {
+                val surfaceTextureHelper = SurfaceTextureHelper.create("CameraCapturerThread", webrtcManager.rootEglBase.eglBaseContext)
+                webrtcManager.attachLocalVideoSource(surfaceTextureHelper, capturer)
+            }
+
+            // Generate SDP Offer and post to Firestore
+            webrtcManager.createOffer { offerSdp ->
+                lifecycleScope.launch {
+                    try {
+                        signalingClient.sendOffer(sessionId, offerSdp.description)
+                    } catch (e: Exception) {
+                        Log.e("CameraAgentService", "Error sending SDP offer", e)
+                    }
+                }
+            }
+
+            // Observe Viewer ICE candidates
+            lifecycleScope.launch {
+                signalingClient.observeViewerIceCandidates(sessionId).collect { candidateRecord ->
+                    val iceCandidate = IceCandidate(candidateRecord.sdpMid, candidateRecord.sdpMLineIndex, candidateRecord.sdp)
+                    webrtcManager.addRemoteIceCandidate(iceCandidate)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CameraAgentService", "Error starting WebRTC session", e)
+        }
+    }
+
     override fun onDestroy() {
         cameraManager.shutdown()
+        try {
+            webrtcManager.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         updateDeviceStatus("OFFLINE")
         super.onDestroy()
     }

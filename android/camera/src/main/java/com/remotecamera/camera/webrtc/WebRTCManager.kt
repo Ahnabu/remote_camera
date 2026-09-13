@@ -115,6 +115,22 @@ class WebRTCManager(private val context: Context) {
         peerConnection?.addIceCandidate(candidate)
     }
 
+    fun createCameraCapturer(context: Context): VideoCapturer? {
+        val enumerator = Camera2Enumerator(context)
+        val deviceNames = enumerator.deviceNames
+        for (deviceName in deviceNames) {
+            if (enumerator.isBackFacing(deviceName)) {
+                return enumerator.createCapturer(deviceName, null)
+            }
+        }
+        for (deviceName in deviceNames) {
+            if (enumerator.isFrontFacing(deviceName)) {
+                return enumerator.createCapturer(deviceName, null)
+            }
+        }
+        return null
+    }
+
     fun close() {
         try {
             peerConnection?.close()
