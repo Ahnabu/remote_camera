@@ -51,7 +51,6 @@ class FirestoreSignalingClient(
         val listener: ListenerRegistration = firestore.collection("signaling").document(sessionId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
                     return@addSnapshotListener
                 }
                 snapshot?.toObject(FirestoreSignalingSession::class.java)?.let { session ->
@@ -94,7 +93,6 @@ class FirestoreSignalingClient(
             .whereEqualTo("sender", "CAMERA")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
                     return@addSnapshotListener
                 }
                 snapshot?.documentChanges?.forEach { change ->

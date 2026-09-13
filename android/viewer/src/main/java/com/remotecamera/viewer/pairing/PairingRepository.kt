@@ -67,7 +67,7 @@ class PairingRepository(
             .whereEqualTo("status", "ACTIVE")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 val pairings = snapshot?.documents?.mapNotNull { doc ->

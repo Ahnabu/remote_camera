@@ -37,7 +37,6 @@ class FirestoreSignalingClient(
             .whereEqualTo("cameraDeviceId", cameraDeviceId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
                     return@addSnapshotListener
                 }
                 snapshot?.documents?.forEach { doc ->
@@ -82,7 +81,6 @@ class FirestoreSignalingClient(
             .whereEqualTo("sender", "VIEWER")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
                     return@addSnapshotListener
                 }
                 snapshot?.documentChanges?.forEach { change ->
