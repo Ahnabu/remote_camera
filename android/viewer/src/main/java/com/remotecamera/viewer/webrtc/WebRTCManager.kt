@@ -108,7 +108,11 @@ class WebRTCManager(private val context: Context) {
     }
 
     fun attachRemoteVideoTrack(surfaceViewRenderer: SurfaceViewRenderer) {
-        surfaceViewRenderer.init(rootEglBase.eglBaseContext, null)
+        try {
+            surfaceViewRenderer.init(rootEglBase.eglBaseContext, null)
+        } catch (e: IllegalStateException) {
+            // Already initialized, ignore
+        }
         surfaceViewRenderer.setEnableHardwareScaler(true)
         remoteVideoTrack?.addSink(surfaceViewRenderer)
     }

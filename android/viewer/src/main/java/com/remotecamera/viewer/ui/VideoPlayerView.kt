@@ -29,9 +29,7 @@ fun WebRTCVideoPlayerView(
         AndroidView(
             factory = { context ->
                 SurfaceViewRenderer(context).apply {
-                    init(webRTCManager.rootEglBase.eglBaseContext, null)
                     setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-                    setEnableHardwareScaler(true)
                     setMirror(false)
                     webRTCManager.attachRemoteVideoTrack(this)
                 }
