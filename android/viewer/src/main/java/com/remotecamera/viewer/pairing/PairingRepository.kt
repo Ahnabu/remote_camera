@@ -1,5 +1,6 @@
 package com.remotecamera.viewer.pairing
 
+import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
 import com.remotecamera.viewer.crypto.CryptoManager
 import kotlinx.coroutines.channels.awaitClose
@@ -9,6 +10,7 @@ import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class PairingRepository(
+    private val context: Context? = null,
     private val customFirestore: FirebaseFirestore? = null,
     private val customCryptoManager: CryptoManager? = null
 ) {
@@ -18,7 +20,30 @@ class PairingRepository(
     private val cryptoManager: CryptoManager
         get() = customCryptoManager ?: CryptoManager()
 
-    val viewerDeviceId: String = "Galaxy_S20_${UUID.randomUUID().toString().take(8)}"
+    val viewerDeviceId: String
+        get() = getPersistentDeviceId(context)
+
+    companion object {
+        private var memoryDeviceId: String? = null
+
+        @Synchronized
+        fun getPersistentDeviceId(context: Context? = null): String {
+            if (context != null) {
+                val prefs = context.getSharedPreferences("remote_camera_prefs", Context.MODE_PRIVATE)
+                var id = prefs.getString("viewer_device_id", null)
+                if (id.isNullOrBlank()) {
+                    id = "Galaxy_S20_${UUID.randomUUID().toString().take(8)}"
+                    prefs.edit().putString("viewer_device_id", id).apply()
+                }
+                memoryDeviceId = id
+                return id
+            }
+            if (memoryDeviceId == null) {
+                memoryDeviceId = "Galaxy_S20_Viewer"
+            }
+            return memoryDeviceId!!
+        }
+    }
 
     /**
      * Verifies scanned camera QR code payload signature and creates a Firestore pairing entry.

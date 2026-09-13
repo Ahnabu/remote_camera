@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
     private var startupError by mutableStateOf<String?>(null)
 
     private val authManager by lazy { AuthManager() }
-    private val pairingRepository by lazy { PairingRepository() }
+    private val pairingRepository by lazy { PairingRepository(this) }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()

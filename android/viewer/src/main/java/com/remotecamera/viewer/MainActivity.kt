@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
     private var startupError by mutableStateOf<String?>(null)
 
     private val authManager by lazy { AuthManager() }
-    private val pairingRepository by lazy { PairingRepository() }
+    private val pairingRepository by lazy { PairingRepository(this) }
     private val signalingClient by lazy { FirestoreSignalingClient() }
 
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
@@ -102,10 +102,7 @@ class MainActivity : ComponentActivity() {
                                     sessionId = signalingClient.initiateSession(cameraDeviceId, pairingRepository.viewerDeviceId)
                                     val currentSessionId = sessionId ?: return@launch
 
-                                    val iceServers = listOf(
-                                        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-                                        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
-                                    )
+                                    val iceServers = com.remotecamera.viewer.webrtc.TurnServerManager().getIceServers()
 
                                     webRTCManager.createPeerConnection(
                                         stunTurnServers = iceServers,

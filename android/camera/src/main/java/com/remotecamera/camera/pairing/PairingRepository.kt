@@ -1,5 +1,6 @@
 package com.remotecamera.camera.pairing
 
+import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
 import com.remotecamera.camera.crypto.CryptoManager
 import kotlinx.coroutines.channels.awaitClose
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.util.UUID
 
 class PairingRepository(
+    private val context: Context? = null,
     private val customFirestore: FirebaseFirestore? = null,
     private val customCryptoManager: CryptoManager? = null
 ) {
@@ -17,7 +19,30 @@ class PairingRepository(
     private val cryptoManager: CryptoManager
         get() = customCryptoManager ?: CryptoManager()
 
-    val cameraDeviceId: String = "Realme_C55_${UUID.randomUUID().toString().take(8)}"
+    val cameraDeviceId: String
+        get() = getPersistentDeviceId(context)
+
+    companion object {
+        private var memoryDeviceId: String? = null
+
+        @Synchronized
+        fun getPersistentDeviceId(context: Context? = null): String {
+            if (context != null) {
+                val prefs = context.getSharedPreferences("remote_camera_prefs", Context.MODE_PRIVATE)
+                var id = prefs.getString("camera_device_id", null)
+                if (id.isNullOrBlank()) {
+                    id = "Realme_C55_${UUID.randomUUID().toString().take(8)}"
+                    prefs.edit().putString("camera_device_id", id).apply()
+                }
+                memoryDeviceId = id
+                return id
+            }
+            if (memoryDeviceId == null) {
+                memoryDeviceId = "Realme_C55_Agent"
+            }
+            return memoryDeviceId!!
+        }
+    }
 
     /**
      * Generates a signed QR pairing payload for this device.

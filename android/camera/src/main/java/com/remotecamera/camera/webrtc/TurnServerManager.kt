@@ -17,15 +17,22 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
     fun getIceServers(): List<PeerConnection.IceServer> {
         val iceServers = mutableListOf<PeerConnection.IceServer>()
 
-        // 1. Google Public STUN Servers
-        iceServers.add(
-            PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
-        )
-        iceServers.add(
-            PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
+        // Public STUN Servers for WAN NAT Traversal (Cellular 4G/5G <-> Wi-Fi)
+        val stunUrls = listOf(
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302",
+            "stun:stun2.l.google.com:19302",
+            "stun:stun3.l.google.com:19302",
+            "stun:stun4.l.google.com:19302",
+            "stun:stun.services.mozilla.com:3478",
+            "stun:global.stun.twilio.com:3478"
         )
 
-        // 2. TURN Server (Coturn) with Ephemeral Credentials or Static Auth
+        for (url in stunUrls) {
+            iceServers.add(PeerConnection.IceServer.builder(url).createIceServer())
+        }
+
+        // TURN Server (Coturn) with Ephemeral Credentials or Static Auth
         if (config.secretKey.isNotBlank()) {
             val (username, credential) = generateEphemeralCredentials(config.secretKey, config.ttlSeconds)
             val turnServer = PeerConnection.IceServer.builder(config.turnUrl)
@@ -33,7 +40,7 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
                 .setPassword(credential)
                 .createIceServer()
             iceServers.add(turnServer)
-        } else {
+        } else if (config.turnUrl.isNotBlank() && !config.turnUrl.contains("remotecamera.com")) {
             val turnServer = PeerConnection.IceServer.builder(config.turnUrl)
                 .setUsername("guest")
                 .setPassword("guest_password")
