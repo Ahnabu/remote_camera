@@ -100,7 +100,9 @@ npm start
 | **Milestone 5** | CameraX & Foreground Service Agent (Realme C55) | ✅ Completed |
 | **Milestone 6** | Native WebRTC Video Transport & Hardware Encoding | ✅ Completed |
 | **Milestone 7** | Viewer Application UI (Galaxy S20) | ✅ Completed |
-| **Milestone 8** | STUN/TURN NAT Traversal & Relay Mode | ⚙️ In Progress |
+| **Milestone 8** | STUN/TURN NAT Traversal & Relay Mode | ✅ Completed |
+| **Milestone 9** | Network Resilience, ICE Restart & FCM Recovery | ✅ Completed |
+| **Milestone 10** | End-to-End Hardening & Testing | ⚙️ In Progress |
 
 ---
 
