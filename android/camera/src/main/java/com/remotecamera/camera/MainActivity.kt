@@ -7,8 +7,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import android.util.Log
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.remotecamera.camera.auth.AuthManager
 import com.remotecamera.camera.pairing.PairingRepository
@@ -19,6 +26,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private var startupError by mutableStateOf<String?>(null)
 
     private val authManager by lazy { AuthManager() }
     private val pairingRepository by lazy { PairingRepository() }
@@ -32,29 +41,58 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        CoroutineScope(Dispatchers.Main).launch {
-            try {
-                authManager.signInAnonymouslyIfNeeded()
-            } catch (e: Exception) {
-                e.printStackTrace()
+        try {
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    authManager.signInAnonymouslyIfNeeded()
+                } catch (e: Throwable) {
+                    Log.e("MainActivity", "Auth error: ${e.message}", e)
+                }
             }
-        }
 
-        checkAndRequestPermissions()
+            checkAndRequestPermissions()
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "Startup error: ${t.message}", t)
+            startupError = t.stackTraceToString()
+        }
 
         setContent {
             MaterialTheme {
-                Surface {
-                    CameraPairingScreen(
-                        pairingRepository = pairingRepository,
-                        onToggleServiceRequested = { enabled, id ->
-                            if (enabled) {
-                                CameraAgentService.startService(this, id)
-                            } else {
-                                CameraAgentService.stopService(this)
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    if (startupError != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                "⚠️ Camera Agent Initialization Error",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.Black)) {
+                                Text(
+                                    text = startupError ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Green,
+                                    modifier = Modifier.padding(12.dp)
+                                )
                             }
                         }
-                    )
+                    } else {
+                        CameraPairingScreen(
+                            pairingRepository = pairingRepository,
+                            onToggleServiceRequested = { enabled, id ->
+                                if (enabled) {
+                                    CameraAgentService.startService(this, id)
+                                } else {
+                                    CameraAgentService.stopService(this)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
