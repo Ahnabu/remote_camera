@@ -32,14 +32,14 @@ class PairingRepository(
                 val prefs = context.getSharedPreferences("remote_camera_prefs", Context.MODE_PRIVATE)
                 var id = prefs.getString("viewer_device_id", null)
                 if (id.isNullOrBlank()) {
-                    id = "Galaxy_S20_${UUID.randomUUID().toString().take(8)}"
+                    id = "Viewer_${UUID.randomUUID().toString().take(8)}"
                     prefs.edit().putString("viewer_device_id", id).apply()
                 }
                 memoryDeviceId = id
                 return id
             }
             if (memoryDeviceId == null) {
-                memoryDeviceId = "Galaxy_S20_Viewer"
+                memoryDeviceId = "Viewer_${android.os.Build.MODEL.replace(" ", "_")}"
             }
             return memoryDeviceId!!
         }

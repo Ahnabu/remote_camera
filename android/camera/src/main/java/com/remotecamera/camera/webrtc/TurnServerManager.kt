@@ -6,7 +6,7 @@ import javax.crypto.spec.SecretKeySpec
 import android.util.Base64
 
 data class TurnConfig(
-    val turnUrl: String = "turn:turn.remotecamera.com:3478",
+    val turnUrl: String = "turn:openrelay.metered.ca:80",
     val secretKey: String = "",
     val ttlSeconds: Long = 3600,
     val forceRelayMode: Boolean = false
@@ -24,6 +24,7 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
             "stun:stun2.l.google.com:19302",
             "stun:stun3.l.google.com:19302",
             "stun:stun4.l.google.com:19302",
+            "stun:stun.l.google.com:443",
             "stun:stun.services.mozilla.com:3478",
             "stun:global.stun.twilio.com:3478"
         )
@@ -32,7 +33,7 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
             iceServers.add(PeerConnection.IceServer.builder(url).createIceServer())
         }
 
-        // TURN Server (Coturn) with Ephemeral Credentials or Static Auth
+        // TURN Fallback Servers for Cross-Network Traversal over Symmetric NAT / Cellular CGNAT
         if (config.secretKey.isNotBlank()) {
             val (username, credential) = generateEphemeralCredentials(config.secretKey, config.ttlSeconds)
             val turnServer = PeerConnection.IceServer.builder(config.turnUrl)
@@ -40,12 +41,20 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
                 .setPassword(credential)
                 .createIceServer()
             iceServers.add(turnServer)
-        } else if (config.turnUrl.isNotBlank() && !config.turnUrl.contains("remotecamera.com")) {
-            val turnServer = PeerConnection.IceServer.builder(config.turnUrl)
-                .setUsername("guest")
-                .setPassword("guest_password")
-                .createIceServer()
-            iceServers.add(turnServer)
+        } else {
+            // Free OpenRelay TURN servers by Metered.ca for fallback relay
+            val openRelayServers = listOf(
+                "turn:openrelay.metered.ca:80",
+                "turn:openrelay.metered.ca:443",
+                "turns:openrelay.metered.ca:443?transport=tcp"
+            )
+            for (turnUrl in openRelayServers) {
+                val turnServer = PeerConnection.IceServer.builder(turnUrl)
+                    .setUsername("openrelayproject")
+                    .setPassword("openrelayproject")
+                    .createIceServer()
+                iceServers.add(turnServer)
+            }
         }
 
         return iceServers
@@ -70,3 +79,4 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
         }
     }
 }
+

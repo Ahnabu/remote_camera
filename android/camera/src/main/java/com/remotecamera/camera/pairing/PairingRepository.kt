@@ -31,14 +31,26 @@ class PairingRepository(
                 val prefs = context.getSharedPreferences("remote_camera_prefs", Context.MODE_PRIVATE)
                 var id = prefs.getString("camera_device_id", null)
                 if (id.isNullOrBlank()) {
-                    id = "Realme_C55_${UUID.randomUUID().toString().take(8)}"
+                    val androidId = try {
+                        android.provider.Settings.Secure.getString(
+                            context.contentResolver,
+                            android.provider.Settings.Secure.ANDROID_ID
+                        )
+                    } catch (e: Exception) { null }
+
+                    val hash = if (!androidId.isNullOrBlank()) {
+                        kotlin.math.abs(androidId.hashCode()).toString(16).padStart(8, '0').take(8)
+                    } else {
+                        UUID.randomUUID().toString().take(8)
+                    }
+                    id = "Camera_Agent_$hash"
                     prefs.edit().putString("camera_device_id", id).apply()
                 }
                 memoryDeviceId = id
                 return id
             }
             if (memoryDeviceId == null) {
-                memoryDeviceId = "Realme_C55_Agent"
+                memoryDeviceId = "Camera_Agent_${android.os.Build.MODEL.replace(" ", "_")}"
             }
             return memoryDeviceId!!
         }

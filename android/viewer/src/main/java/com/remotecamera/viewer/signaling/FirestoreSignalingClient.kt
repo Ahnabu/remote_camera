@@ -13,7 +13,14 @@ data class FirestoreSignalingSession(
     val viewerDeviceId: String = "",
     val status: String = "INITIATED", // INITIATED, OFFERED, ANSWERED, CONNECTED, STOPPED
     val offerSdp: String? = null,
-    val answerSdp: String? = null
+    val answerSdp: String? = null,
+    val torchEnabled: Boolean? = null,
+    val switchCameraRequested: Long? = null,
+    val iceRestartRequested: Long? = null,
+    val qualityProfile: String? = null,
+    val photoBurstActive: Boolean? = null,
+    val lastCommand: String? = null,
+    val lastCommandTimestamp: Long? = null
 )
 
 data class IceCandidateRecord(
@@ -33,7 +40,7 @@ class FirestoreSignalingClient(
      * Viewer initiates a new stream session in Firestore.
      */
     suspend fun initiateSession(cameraDeviceId: String, viewerDeviceId: String): String {
-        val sessionId = "${cameraDeviceId}_${viewerDeviceId}"
+        val sessionId = "${cameraDeviceId}_${viewerDeviceId}_${System.currentTimeMillis()}"
         val session = FirestoreSignalingSession(
             sessionId = sessionId,
             cameraDeviceId = cameraDeviceId,
@@ -42,6 +49,19 @@ class FirestoreSignalingClient(
         )
         firestore.collection("signaling").document(sessionId).set(session).await()
         return sessionId
+    }
+
+    /**
+     * Marks session as STOPPED in Firestore when viewer disconnects.
+     */
+    suspend fun stopSession(sessionId: String) {
+        try {
+            firestore.collection("signaling").document(sessionId).update(
+                mapOf("status" to "STOPPED")
+            ).await()
+        } catch (e: Exception) {
+            // Ignore if doc already cleaned up
+        }
     }
 
     /**
@@ -68,6 +88,73 @@ class FirestoreSignalingClient(
             mapOf(
                 "answerSdp" to answerSdp,
                 "status" to "ANSWERED"
+            )
+        ).await()
+    }
+
+    /**
+     * Sends torch light ON/OFF command to Camera Agent via Firestore.
+     */
+    suspend fun sendTorchCommand(sessionId: String, enabled: Boolean) {
+        firestore.collection("signaling").document(sessionId).update(
+            mapOf(
+                "torchEnabled" to enabled,
+                "lastCommand" to if (enabled) "TORCH_ON" else "TORCH_OFF",
+                "lastCommandTimestamp" to System.currentTimeMillis()
+            )
+        ).await()
+    }
+
+    /**
+     * Sends switch camera (front/back lens) command to Camera Agent via Firestore.
+     */
+    suspend fun sendSwitchCameraCommand(sessionId: String) {
+        val timestamp = System.currentTimeMillis()
+        firestore.collection("signaling").document(sessionId).update(
+            mapOf(
+                "switchCameraRequested" to timestamp,
+                "lastCommand" to "SWITCH_CAMERA",
+                "lastCommandTimestamp" to timestamp
+            )
+        ).await()
+    }
+
+    /**
+     * Sends ICE restart / reconnect command to Camera Agent via Firestore.
+     */
+    suspend fun sendIceRestartCommand(sessionId: String) {
+        val timestamp = System.currentTimeMillis()
+        firestore.collection("signaling").document(sessionId).update(
+            mapOf(
+                "iceRestartRequested" to timestamp,
+                "lastCommand" to "ICE_RESTART",
+                "lastCommandTimestamp" to timestamp
+            )
+        ).await()
+    }
+
+    /**
+     * Sends quality profile setting command to Camera Agent via Firestore.
+     */
+    suspend fun sendQualityProfileCommand(sessionId: String, profileLabel: String) {
+        firestore.collection("signaling").document(sessionId).update(
+            mapOf(
+                "qualityProfile" to profileLabel,
+                "lastCommand" to "QUALITY_$profileLabel",
+                "lastCommandTimestamp" to System.currentTimeMillis()
+            )
+        ).await()
+    }
+
+    /**
+     * Sends Photo Burst mode (10 FPS capture) status to Camera Agent via Firestore.
+     */
+    suspend fun sendPhotoBurstCommand(sessionId: String, active: Boolean) {
+        firestore.collection("signaling").document(sessionId).update(
+            mapOf(
+                "photoBurstActive" to active,
+                "lastCommand" to if (active) "PHOTO_BURST_START" else "PHOTO_BURST_STOP",
+                "lastCommandTimestamp" to System.currentTimeMillis()
             )
         ).await()
     }

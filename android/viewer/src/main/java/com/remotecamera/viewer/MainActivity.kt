@@ -94,13 +94,17 @@ class MainActivity : ComponentActivity() {
                         val webRTCManager = remember { WebRTCManager(this@MainActivity) }
                         val scope = rememberCoroutineScope()
 
-                        DisposableEffect(cameraDeviceId) {
-                            var sessionId: String? = null
+                        var activeSessionId by remember { mutableStateOf<String?>(null) }
+                        var isPhotoBurstActive by remember { mutableStateOf(false) }
+                        var savedPhotoCount by remember { mutableStateOf(0) }
 
+                        DisposableEffect(cameraDeviceId) {
                             scope.launch {
                                 try {
-                                    sessionId = signalingClient.initiateSession(cameraDeviceId, pairingRepository.viewerDeviceId)
-                                    val currentSessionId = sessionId ?: return@launch
+                                    com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Initiating signaling session with camera: $cameraDeviceId")
+                                    val sid = signalingClient.initiateSession(cameraDeviceId, pairingRepository.viewerDeviceId)
+                                    activeSessionId = sid
+                                    val currentSessionId = sid
 
                                     val iceServers = com.remotecamera.viewer.webrtc.TurnServerManager().getIceServers()
 
@@ -109,10 +113,11 @@ class MainActivity : ComponentActivity() {
                                         onIceCandidateGenerated = { candidate ->
                                             scope.launch {
                                                 signalingClient.sendIceCandidate(currentSessionId, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp)
+                                                com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Sent ICE candidate to camera")
                                             }
                                         },
                                         onRemoteVideoTrackReceived = { track ->
-                                            Log.d("ViewerMainActivity", "Remote video track received!")
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "🎥 Remote video track received!", com.remotecamera.viewer.debug.LogLevel.SUCCESS)
                                         }
                                     )
 
@@ -120,9 +125,11 @@ class MainActivity : ComponentActivity() {
                                     scope.launch {
                                         signalingClient.observeSession(currentSessionId).collect { session ->
                                             if (!session.offerSdp.isNullOrBlank() && session.status == "OFFERED") {
+                                                com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Received SDP Offer from camera agent", com.remotecamera.viewer.debug.LogLevel.SUCCESS)
                                                 webRTCManager.setRemoteOfferAndCreateAnswer(session.offerSdp) { answerDesc ->
                                                     scope.launch {
                                                         signalingClient.sendAnswer(currentSessionId, answerDesc.description)
+                                                        com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Sent SDP Answer to camera agent", com.remotecamera.viewer.debug.LogLevel.SUCCESS)
                                                     }
                                                 }
                                             }
@@ -134,14 +141,21 @@ class MainActivity : ComponentActivity() {
                                         signalingClient.observeCameraIceCandidates(currentSessionId).collect { candidateRecord ->
                                             val iceCandidate = IceCandidate(candidateRecord.sdpMid, candidateRecord.sdpMLineIndex, candidateRecord.sdp)
                                             webRTCManager.addRemoteIceCandidate(iceCandidate)
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Received Camera ICE Candidate")
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    Log.e("ViewerMainActivity", "Signaling session error", e)
+                                    com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Signaling session error: ${e.message}", com.remotecamera.viewer.debug.LogLevel.ERROR)
                                 }
                             }
 
                             onDispose {
+                                webRTCManager.stop10FpsPhotoCapture()
+                                activeSessionId?.let { sid ->
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        signalingClient.stopSession(sid)
+                                    }
+                                }
                                 webRTCManager.close()
                             }
                         }
@@ -149,15 +163,108 @@ class MainActivity : ComponentActivity() {
                         StreamViewerScreen(
                             cameraDeviceId = cameraDeviceId,
                             webRTCManager = webRTCManager,
+                            isPhotoBurstActive = isPhotoBurstActive,
+                            savedPhotoCount = savedPhotoCount,
                             onStopStreamRequested = {
+                                com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Stream stop requested")
+                                webRTCManager.stop10FpsPhotoCapture()
+                                activeSessionId?.let { sid ->
+                                    scope.launch {
+                                        signalingClient.stopSession(sid)
+                                    }
+                                }
                                 activeConnectedCameraId = null
                             },
                             onIceRestartRequested = {
-                                // Ice restart if needed
+                                activeSessionId?.let { sid ->
+                                    scope.launch {
+                                        try {
+                                            signalingClient.sendIceRestartCommand(sid)
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Sent ICE Restart command to Camera", com.remotecamera.viewer.debug.LogLevel.WARNING)
+                                        } catch (e: Exception) {
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Failed to send ICE restart: ${e.message}", com.remotecamera.viewer.debug.LogLevel.ERROR)
+                                        }
+                                    }
+                                }
                             },
-                            onTorchToggleRequested = { _ -> },
-                            onSwitchCameraRequested = { },
-                            onQualitySelected = { }
+                            onTorchToggleRequested = { enabled ->
+                                activeSessionId?.let { sid ->
+                                    scope.launch {
+                                        try {
+                                            signalingClient.sendTorchCommand(sid, enabled)
+                                            com.remotecamera.viewer.debug.DebugLogger.log(
+                                                "Viewer",
+                                                "🔦 Sent Torch command ($enabled) to Camera",
+                                                com.remotecamera.viewer.debug.LogLevel.SUCCESS
+                                            )
+                                        } catch (e: Exception) {
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Failed to send torch command: ${e.message}", com.remotecamera.viewer.debug.LogLevel.ERROR)
+                                        }
+                                    }
+                                }
+                            },
+                            onSwitchCameraRequested = {
+                                activeSessionId?.let { sid ->
+                                    scope.launch {
+                                        try {
+                                            signalingClient.sendSwitchCameraCommand(sid)
+                                            com.remotecamera.viewer.debug.DebugLogger.log(
+                                                "Viewer",
+                                                "📷 Sent Switch Camera command to Camera",
+                                                com.remotecamera.viewer.debug.LogLevel.SUCCESS
+                                            )
+                                        } catch (e: Exception) {
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Failed to send switch camera command: ${e.message}", com.remotecamera.viewer.debug.LogLevel.ERROR)
+                                        }
+                                    }
+                                }
+                            },
+                            onQualitySelected = { profile ->
+                                activeSessionId?.let { sid ->
+                                    scope.launch {
+                                        try {
+                                            signalingClient.sendQualityProfileCommand(sid, profile.label)
+                                            com.remotecamera.viewer.debug.DebugLogger.log(
+                                                "Viewer",
+                                                "⚙️ Sent Quality command (${profile.label}) to Camera",
+                                                com.remotecamera.viewer.debug.LogLevel.SUCCESS
+                                            )
+                                        } catch (e: Exception) {
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Failed to send quality command: ${e.message}", com.remotecamera.viewer.debug.LogLevel.ERROR)
+                                        }
+                                    }
+                                }
+                            },
+                            onPhotoBurstToggleRequested = { active ->
+                                isPhotoBurstActive = active
+                                if (active) {
+                                    savedPhotoCount = 0
+                                    webRTCManager.start10FpsPhotoCapture(cameraDeviceId) { count ->
+                                        savedPhotoCount = count
+                                    }
+                                    com.remotecamera.viewer.debug.DebugLogger.log(
+                                        "Viewer",
+                                        "📸 Started 10 FPS photo capture into Pictures/RemoteCamera_$cameraDeviceId",
+                                        com.remotecamera.viewer.debug.LogLevel.SUCCESS
+                                    )
+                                } else {
+                                    webRTCManager.stop10FpsPhotoCapture()
+                                    com.remotecamera.viewer.debug.DebugLogger.log(
+                                        "Viewer",
+                                        "🛑 Stopped 10 FPS photo capture (Total saved: $savedPhotoCount photos)",
+                                        com.remotecamera.viewer.debug.LogLevel.WARNING
+                                    )
+                                }
+                                activeSessionId?.let { sid ->
+                                    scope.launch {
+                                        try {
+                                            signalingClient.sendPhotoBurstCommand(sid, active)
+                                        } catch (e: Exception) {
+                                            com.remotecamera.viewer.debug.DebugLogger.log("Viewer", "Failed to send photo burst command: ${e.message}", com.remotecamera.viewer.debug.LogLevel.ERROR)
+                                        }
+                                    }
+                                }
+                            }
                         )
                     } else {
                         ViewerPairingScreen(
@@ -166,7 +273,7 @@ class MainActivity : ComponentActivity() {
                                 try {
                                     val options = ScanOptions().apply {
                                         setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                        setPrompt("Scan Realme Camera Agent QR Code")
+                                        setPrompt("Scan Camera Agent QR Code")
                                         setCameraId(0)
                                         setBeepEnabled(true)
                                         setBarcodeImageEnabled(true)

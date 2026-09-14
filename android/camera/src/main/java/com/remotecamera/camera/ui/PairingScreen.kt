@@ -27,7 +27,7 @@ fun CameraPairingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Realme C55 — Camera Agent") },
+                title = { Text("Remote Camera Agent") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -42,7 +42,7 @@ fun CameraPairingScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Scan QR Code on Samsung S20 Viewer to Pair",
+                text = "Scan QR Code on Viewer App to Pair",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -97,7 +97,85 @@ fun CameraPairingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            val debugLogs by com.remotecamera.camera.debug.DebugLogger.logs.collectAsState()
+            var isConsoleExpanded by remember { mutableStateOf(true) }
+            val context = androidx.compose.ui.platform.LocalContext.current
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Black)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "🛠️ Live Debug Console (${debugLogs.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = androidx.compose.ui.graphics.Color.Green
+                        )
+                        Row {
+                            TextButton(onClick = {
+                                if (debugLogs.isNotEmpty()) {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clipText = debugLogs.joinToString("\n") { "[${it.timestamp}] [${it.tag}] ${it.message}" }
+                                    val clip = android.content.ClipData.newPlainText("Camera Agent Debug Logs", clipText)
+                                    clipboard.setPrimaryClip(clip)
+                                    android.widget.Toast.makeText(context, "Copied ${debugLogs.size} logs to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }) {
+                                Text("📋 Copy", color = androidx.compose.ui.graphics.Color.Yellow, style = MaterialTheme.typography.labelMedium)
+                            }
+                            TextButton(onClick = { isConsoleExpanded = !isConsoleExpanded }) {
+                                Text(
+                                    if (isConsoleExpanded) "Hide" else "Expand",
+                                    color = androidx.compose.ui.graphics.Color.Cyan,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+
+                    if (isConsoleExpanded) {
+                        HorizontalDivider(color = androidx.compose.ui.graphics.Color.DarkGray, modifier = Modifier.padding(vertical = 4.dp))
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 180.dp)
+                        ) {
+                            if (debugLogs.isEmpty()) {
+                                item {
+                                    Text(
+                                        "Standing by for signaling events...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = androidx.compose.ui.graphics.Color.Gray
+                                    )
+                                }
+                            }
+                            items(debugLogs.reversed()) { log ->
+                                val color = when (log.level) {
+                                    com.remotecamera.camera.debug.LogLevel.ERROR -> androidx.compose.ui.graphics.Color.Red
+                                    com.remotecamera.camera.debug.LogLevel.WARNING -> androidx.compose.ui.graphics.Color.Yellow
+                                    com.remotecamera.camera.debug.LogLevel.SUCCESS -> androidx.compose.ui.graphics.Color.Green
+                                    else -> androidx.compose.ui.graphics.Color.White
+                                }
+                                Text(
+                                    text = "[${log.timestamp}] [${log.tag}] ${log.message}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = color,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "Paired Viewers (${pairedDevices.size})",
@@ -112,7 +190,7 @@ fun CameraPairingScreen(
                         supportingContent = { Text("Paired at: ${device.pairedAt}") },
                         leadingContent = { Text("✅", style = MaterialTheme.typography.titleMedium) }
                     )
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }

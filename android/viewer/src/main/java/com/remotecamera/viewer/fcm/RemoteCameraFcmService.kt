@@ -8,8 +8,8 @@ class RemoteCameraFcmService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        println("[FCM] New token generated for Viewer device: $token")
-        FirebaseFirestore.getInstance().collection("devices").document("Galaxy_S20_Viewer")
+        val deviceId = com.remotecamera.viewer.pairing.PairingRepository.getPersistentDeviceId(this)
+        FirebaseFirestore.getInstance().collection("devices").document(deviceId)
             .update("fcmToken", token)
     }
 

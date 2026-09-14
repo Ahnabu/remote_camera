@@ -9,7 +9,7 @@ class SystemIntegrityTest {
     @Test
     fun testPairingPayloadSerialization() {
         val payload = PairingPayload(
-            cameraDeviceId = "Realme_C55_Test",
+            cameraDeviceId = "Camera_Agent_Test",
             cameraPublicKey = "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE...",
             challenge = "test_challenge_nonce_12345",
             signature = "MEQCIH...=="
@@ -17,7 +17,7 @@ class SystemIntegrityTest {
 
         val json = payload.toJson()
         assertNotNull(json)
-        assertTrue(json.contains("Realme_C55_Test"))
+        assertTrue(json.contains("Camera_Agent_Test"))
 
         val deserialized = PairingPayload.fromJson(json)
         assertNotNull(deserialized)

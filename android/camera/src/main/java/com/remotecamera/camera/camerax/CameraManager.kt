@@ -78,7 +78,50 @@ class CameraManager(private val context: Context) {
     }
 
     fun setTorchEnabled(enabled: Boolean) {
-        camera?.cameraControl?.enableTorch(enabled)
+        // Method 1: CameraX enableTorch (Primary if CameraX is active)
+        if (camera != null) {
+            try {
+                camera?.cameraControl?.enableTorch(enabled)
+                com.remotecamera.camera.debug.DebugLogger.log(
+                    "CameraManager",
+                    "💡 CameraX enableTorch($enabled) executed on active camera!",
+                    com.remotecamera.camera.debug.LogLevel.SUCCESS
+                )
+                return
+            } catch (e: Exception) {
+                com.remotecamera.camera.debug.DebugLogger.log(
+                    "CameraManager",
+                    "CameraX enableTorch error: ${e.message}, falling back to System setTorchMode",
+                    com.remotecamera.camera.debug.LogLevel.WARNING
+                )
+            }
+        }
+
+        // Method 2: System Camera2 setTorchMode Fallback
+        try {
+            val sysCameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
+            val cameraId = sysCameraManager?.cameraIdList?.firstOrNull { id ->
+                val characteristics = sysCameraManager.getCameraCharacteristics(id)
+                val hasFlash = characteristics.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                val facing = characteristics.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING)
+                facing == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK && hasFlash
+            } ?: sysCameraManager?.cameraIdList?.firstOrNull()
+
+            if (sysCameraManager != null && cameraId != null) {
+                sysCameraManager.setTorchMode(cameraId, enabled)
+                com.remotecamera.camera.debug.DebugLogger.log(
+                    "CameraManager",
+                    "💡 System setTorchMode($enabled) executed on camera: $cameraId",
+                    com.remotecamera.camera.debug.LogLevel.SUCCESS
+                )
+            }
+        } catch (e: Exception) {
+            com.remotecamera.camera.debug.DebugLogger.log(
+                "CameraManager",
+                "System setTorchMode failed: ${e.message}",
+                com.remotecamera.camera.debug.LogLevel.ERROR
+            )
+        }
     }
 
     fun stopCamera() {

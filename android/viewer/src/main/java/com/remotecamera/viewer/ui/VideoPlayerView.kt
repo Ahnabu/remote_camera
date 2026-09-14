@@ -20,6 +20,17 @@ fun WebRTCVideoPlayerView(
     modifier: Modifier = Modifier
 ) {
     val connectionState by webRTCManager.connectionState.collectAsState()
+    val remoteVideoTrack by webRTCManager.remoteVideoTrackState.collectAsState()
+    var surfaceViewRendererRef by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
+
+    LaunchedEffect(remoteVideoTrack, surfaceViewRendererRef) {
+        val track = remoteVideoTrack
+        val renderer = surfaceViewRendererRef
+        if (track != null && renderer != null) {
+            webRTCManager.attachRemoteVideoTrack(renderer)
+            com.remotecamera.viewer.debug.DebugLogger.log("VideoPlayerView", "📺 Attached SurfaceViewRenderer to remote video track!", com.remotecamera.viewer.debug.LogLevel.SUCCESS)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -31,7 +42,28 @@ fun WebRTCVideoPlayerView(
                 SurfaceViewRenderer(context).apply {
                     setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     setMirror(false)
+                    try {
+                        val events = object : RendererCommon.RendererEvents {
+                            override fun onFirstFrameRendered() {
+                                com.remotecamera.viewer.debug.DebugLogger.log(
+                                    "VideoPlayerView",
+                                    "🎉 FIRST FRAME RENDERED ON SURFACEVIEWRENDERER!",
+                                    com.remotecamera.viewer.debug.LogLevel.SUCCESS
+                                )
+                            }
+                            override fun onFrameResolutionChanged(width: Int, height: Int, rotation: Int) {
+                                com.remotecamera.viewer.debug.DebugLogger.log(
+                                    "VideoPlayerView",
+                                    "📐 Video Frame Resolution Changed: ${width}x${height}, rotation=$rotation",
+                                    com.remotecamera.viewer.debug.LogLevel.INFO
+                                )
+                            }
+                        }
+                        init(webRTCManager.rootEglBase.eglBaseContext, events)
+                    } catch (e: Exception) { }
+                    setEnableHardwareScaler(true)
                     webRTCManager.attachRemoteVideoTrack(this)
+                    surfaceViewRendererRef = this
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -72,3 +104,4 @@ fun WebRTCVideoPlayerView(
         }
     }
 }
+

@@ -13,7 +13,14 @@ data class FirestoreSignalingSession(
     val viewerDeviceId: String = "",
     val status: String = "INITIATED", // INITIATED, OFFERED, ANSWERED, CONNECTED, STOPPED
     val offerSdp: String? = null,
-    val answerSdp: String? = null
+    val answerSdp: String? = null,
+    val torchEnabled: Boolean? = null,
+    val switchCameraRequested: Long? = null,
+    val iceRestartRequested: Long? = null,
+    val qualityProfile: String? = null,
+    val photoBurstActive: Boolean? = null,
+    val lastCommand: String? = null,
+    val lastCommandTimestamp: Long? = null
 )
 
 data class IceCandidateRecord(
@@ -39,10 +46,9 @@ class FirestoreSignalingClient(
                 if (error != null) {
                     return@addSnapshotListener
                 }
-                snapshot?.documents?.forEach { doc ->
-                    doc.toObject(FirestoreSignalingSession::class.java)?.let { session ->
-                        trySend(session)
-                    }
+                snapshot?.documentChanges?.forEach { change ->
+                    val session = change.document.toObject(FirestoreSignalingSession::class.java)
+                    trySend(session)
                 }
             }
         awaitClose { listener.remove() }

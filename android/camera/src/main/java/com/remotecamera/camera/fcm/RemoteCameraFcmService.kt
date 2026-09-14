@@ -9,8 +9,8 @@ class RemoteCameraFcmService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         println("[FCM] New token generated for Camera device: $token")
-        // Store FCM token in Firestore for recovery notifications
-        FirebaseFirestore.getInstance().collection("devices").document("Realme_C55_Agent")
+        val deviceId = com.remotecamera.camera.pairing.PairingRepository.getPersistentDeviceId(this)
+        FirebaseFirestore.getInstance().collection("devices").document(deviceId)
             .update("fcmToken", token)
     }
 
