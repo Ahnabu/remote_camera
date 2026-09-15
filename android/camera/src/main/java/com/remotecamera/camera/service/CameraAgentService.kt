@@ -107,20 +107,11 @@ class CameraAgentService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stopIntent = Intent(this, CameraAgentService::class.java).apply {
-            action = ACTION_STOP_SERVICE
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            this, 0, stopIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Remote Camera Agent")
-            .setContentText("Remote Camera Service active.")
+            .setContentTitle("Camera Service")
+            .setContentText("Camera Agent Service running")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_delete, "Stop Remote Mode", stopPendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

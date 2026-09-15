@@ -1,6 +1,3 @@
-# Project Documentation Folder (Ignored as requested)
-docs/
-
 # Build & System Logs
 *.log
 firebase-debug.log

@@ -62,8 +62,20 @@ class WebRTCManager(private val context: Context) {
             .createPeerConnectionFactory()
     }
 
+    private fun parseCandidateType(sdp: String): String {
+        val lower = sdp.lowercase()
+        return when {
+            lower.contains("typ host") -> "host"
+            lower.contains("typ srflx") -> "srflx"
+            lower.contains("typ relay") -> "relay"
+            lower.contains("typ prflx") -> "prflx"
+            else -> "unknown"
+        }
+    }
+
     fun createPeerConnection(
         stunTurnServers: List<PeerConnection.IceServer>,
+        forceRelayMode: Boolean = false,
         onIceCandidateGenerated: (IceCandidate) -> Unit,
         onRemoteVideoTrackReceived: (VideoTrack) -> Unit
     ): PeerConnection? {
@@ -74,14 +86,18 @@ class WebRTCManager(private val context: Context) {
         val rtcConfig = PeerConnection.RTCConfiguration(stunTurnServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            if (forceRelayMode) {
+                iceTransportsType = PeerConnection.IceTransportsType.RELAY
+            }
         }
 
         peerConnection = factory?.createPeerConnection(rtcConfig, object : PeerConnectionAdapter() {
             override fun onIceCandidate(candidate: IceCandidate?) {
                 candidate?.let {
+                    val candidateType = parseCandidateType(it.sdp)
                     com.remotecamera.viewer.debug.DebugLogger.log(
                         TAG,
-                        "❄️ Generated Viewer Local ICE Candidate: sdpMid=${it.sdpMid}, sdpMLineIndex=${it.sdpMLineIndex}"
+                        "❄️ Generated Viewer Local ICE Candidate: type=$candidateType, sdpMid=${it.sdpMid}, sdpMLineIndex=${it.sdpMLineIndex}"
                     )
                     onIceCandidateGenerated(it)
                 }
@@ -107,6 +123,9 @@ class WebRTCManager(private val context: Context) {
                         else -> com.remotecamera.viewer.debug.LogLevel.INFO
                     }
                 )
+                if (newState == PeerConnection.IceConnectionState.CONNECTED || newState == PeerConnection.IceConnectionState.COMPLETED) {
+                    logStatsReport()
+                }
                 when (newState) {
                     PeerConnection.IceConnectionState.CHECKING -> _connectionState.value = WebRTCState.Connecting
                     PeerConnection.IceConnectionState.CONNECTED,
@@ -172,12 +191,13 @@ class WebRTCManager(private val context: Context) {
 
     @Synchronized
     fun addRemoteIceCandidate(candidate: IceCandidate) {
+        val candType = parseCandidateType(candidate.sdp)
         if (isRemoteDescriptionSet && peerConnection != null) {
             peerConnection?.addIceCandidate(candidate)
-            com.remotecamera.viewer.debug.DebugLogger.log(TAG, "➕ Applied Camera ICE Candidate: sdpMid=${candidate.sdpMid}")
+            com.remotecamera.viewer.debug.DebugLogger.log(TAG, "➕ Applied Camera ICE Candidate: type=$candType, sdpMid=${candidate.sdpMid}")
         } else {
             queuedRemoteCandidates.add(candidate)
-            com.remotecamera.viewer.debug.DebugLogger.log(TAG, "⏳ Queued Camera ICE Candidate (waiting for Remote Offer): total queued=${queuedRemoteCandidates.size}")
+            com.remotecamera.viewer.debug.DebugLogger.log(TAG, "⏳ Queued Camera ICE Candidate (type=$candType, waiting for Remote Offer): total queued=${queuedRemoteCandidates.size}")
         }
     }
 
@@ -204,7 +224,16 @@ class WebRTCManager(private val context: Context) {
 
     fun logStatsReport() {
         peerConnection?.getStats { report ->
+            var activePairStats: RTCStats? = null
             for (stats in report.statsMap.values) {
+                if (stats.type == "candidate-pair") {
+                    val state = stats.members["state"]
+                    val nominated = stats.members["nominated"]
+                    val bytesReceived = stats.members["bytesReceived"]
+                    if (state == "succeeded" || nominated == true || (bytesReceived as? Number)?.toLong() ?: 0L > 0L) {
+                        activePairStats = stats
+                    }
+                }
                 if (stats.type == "inbound-rtp") {
                     val bytesReceived = stats.members["bytesReceived"]
                     val packetsReceived = stats.members["packetsReceived"]
@@ -216,6 +245,22 @@ class WebRTCManager(private val context: Context) {
                         com.remotecamera.viewer.debug.LogLevel.INFO
                     )
                 }
+            }
+            if (activePairStats != null) {
+                val localCandId = activePairStats.members["localCandidateId"] as? String
+                val remoteCandId = activePairStats.members["remoteCandidateId"] as? String
+                val localCandStats = report.statsMap[localCandId]
+                val remoteCandStats = report.statsMap[remoteCandId]
+                val localType = localCandStats?.members?.get("candidateType") ?: "unknown"
+                val remoteType = remoteCandStats?.members?.get("candidateType") ?: "unknown"
+                val localProtocol = localCandStats?.members?.get("protocol") ?: "udp"
+                val remoteProtocol = remoteCandStats?.members?.get("protocol") ?: "udp"
+
+                com.remotecamera.viewer.debug.DebugLogger.log(
+                    TAG,
+                    "🎯 SELECTED ICE CANDIDATE PAIR: localType=$localType, remoteType=$remoteType, localProtocol=$localProtocol, remoteProtocol=$remoteProtocol",
+                    com.remotecamera.viewer.debug.LogLevel.SUCCESS
+                )
             }
         }
     }

@@ -12,7 +12,7 @@ data class TurnConfig(
     val forceRelayMode: Boolean = false
 )
 
-class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
+class TurnServerManager(val config: TurnConfig = TurnConfig()) {
 
     fun getIceServers(): List<PeerConnection.IceServer> {
         val iceServers = mutableListOf<PeerConnection.IceServer>()
@@ -24,7 +24,6 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
             "stun:stun2.l.google.com:19302",
             "stun:stun3.l.google.com:19302",
             "stun:stun4.l.google.com:19302",
-            "stun:stun.l.google.com:443",
             "stun:stun.services.mozilla.com:3478",
             "stun:global.stun.twilio.com:3478"
         )
@@ -33,27 +32,36 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
             iceServers.add(PeerConnection.IceServer.builder(url).createIceServer())
         }
 
-        // TURN Fallback Servers for Cross-Network Traversal over Symmetric NAT / Cellular CGNAT
+        // TURN Fallback Servers with explicit transport definitions (UDP and TCP)
         if (config.secretKey.isNotBlank()) {
             val (username, credential) = generateEphemeralCredentials(config.secretKey, config.ttlSeconds)
-            val turnServer = PeerConnection.IceServer.builder(config.turnUrl)
-                .setUsername(username)
-                .setPassword(credential)
-                .createIceServer()
-            iceServers.add(turnServer)
-        } else {
-            // Free OpenRelay TURN servers by Metered.ca for fallback relay
-            val openRelayServers = listOf(
-                "turn:openrelay.metered.ca:80",
-                "turn:openrelay.metered.ca:443",
-                "turns:openrelay.metered.ca:443?transport=tcp"
+            val turnTransports = listOf(
+                if (config.turnUrl.contains("?")) "${config.turnUrl}&transport=udp" else "${config.turnUrl}?transport=udp",
+                if (config.turnUrl.contains("?")) "${config.turnUrl}&transport=tcp" else "${config.turnUrl}?transport=tcp"
             )
-            for (turnUrl in openRelayServers) {
-                val turnServer = PeerConnection.IceServer.builder(turnUrl)
-                    .setUsername("openrelayproject")
-                    .setPassword("openrelayproject")
-                    .createIceServer()
-                iceServers.add(turnServer)
+            for (url in turnTransports) {
+                iceServers.add(
+                    PeerConnection.IceServer.builder(url)
+                        .setUsername(username)
+                        .setPassword(credential)
+                        .createIceServer()
+                )
+            }
+        } else {
+            // Metered OpenRelay TURN servers with explicit transport declarations for fallback relay
+            val openRelayServers = listOf(
+                Triple("turn:openrelay.metered.ca:80?transport=udp", "openrelayproject", "openrelayproject"),
+                Triple("turn:openrelay.metered.ca:80?transport=tcp", "openrelayproject", "openrelayproject"),
+                Triple("turn:openrelay.metered.ca:443?transport=tcp", "openrelayproject", "openrelayproject"),
+                Triple("turns:openrelay.metered.ca:443?transport=tcp", "openrelayproject", "openrelayproject")
+            )
+            for ((turnUrl, user, pass) in openRelayServers) {
+                iceServers.add(
+                    PeerConnection.IceServer.builder(turnUrl)
+                        .setUsername(user)
+                        .setPassword(pass)
+                        .createIceServer()
+                )
             }
         }
 
@@ -79,4 +87,5 @@ class TurnServerManager(private val config: TurnConfig = TurnConfig()) {
         }
     }
 }
+
 
